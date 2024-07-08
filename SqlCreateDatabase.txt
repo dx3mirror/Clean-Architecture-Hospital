@@ -1,0 +1,307 @@
+CREATE TABLE Patients (
+    PatientID INT PRIMARY KEY IDENTITY(1,1),
+    FirstName NVARCHAR(50) NOT NULL,
+    LastName NVARCHAR(50) NOT NULL,
+    DateOfBirth DATE,
+    Phone NVARCHAR(15),
+    Email NVARCHAR(50)
+);
+
+-- Таблица врачей
+CREATE TABLE Doctors (
+    DoctorID INT PRIMARY KEY IDENTITY(1,1),
+    FirstName NVARCHAR(50) NOT NULL,
+    LastName NVARCHAR(50) NOT NULL,
+    SpecializationID INT,
+    Phone NVARCHAR(15),
+    Email NVARCHAR(50)
+);
+
+-- Таблица специализаций врачей
+CREATE TABLE Specializations (
+    SpecializationID INT PRIMARY KEY IDENTITY(1,1),
+    SpecializationName NVARCHAR(100) NOT NULL
+);
+
+-- Таблица типов талонов
+CREATE TABLE TicketTypes (
+    TicketTypeID INT PRIMARY KEY IDENTITY(1,1),
+    TicketTypeName NVARCHAR(50) NOT NULL
+);
+
+-- Таблица талонов
+CREATE TABLE Tickets (
+    TicketID INT PRIMARY KEY IDENTITY(1,1),
+    PatientID INT,
+    DoctorID INT,
+    TicketTypeID INT,
+    AppointmentDateTime DATETIME,
+    Status NVARCHAR(20),
+    FOREIGN KEY (PatientID) REFERENCES Patients(PatientID),
+    FOREIGN KEY (DoctorID) REFERENCES Doctors(DoctorID),
+    FOREIGN KEY (TicketTypeID) REFERENCES TicketTypes(TicketTypeID)
+);
+
+-- Таблица расписания работы врачей
+CREATE TABLE Schedules (
+    ScheduleID INT PRIMARY KEY IDENTITY(1,1),
+    DoctorID INT,
+    WorkDay DATE,
+    StartTime TIME,
+    EndTime TIME,
+    FOREIGN KEY (DoctorID) REFERENCES Doctors(DoctorID)
+);
+
+-- 3. Установление связей между таблицами
+
+-- Связь между таблицей Doctors и таблицей Specializations
+ALTER TABLE Doctors
+ADD CONSTRAINT FK_Doctors_Specializations
+FOREIGN KEY (SpecializationID)
+REFERENCES Specializations (SpecializationID);
+
+
+--Получение списка всех врачей и их специализаций
+SELECT 
+    d.DoctorID, 
+    d.FirstName, 
+    d.LastName, 
+    s.SpecializationName, 
+    d.Phone, 
+    d.Email
+FROM 
+    Doctors d
+JOIN 
+    Specializations s ON d.SpecializationID = s.SpecializationID;
+
+--Получение расписания работы врача по его ID
+SELECT 
+    sc.ScheduleID, 
+    sc.WorkDay, 
+    sc.StartTime, 
+    sc.EndTime
+FROM 
+    Schedules sc
+WHERE 
+    sc.DoctorID = 1;
+
+--Получение всех талонов для конкретного пациента
+SELECT 
+    t.TicketID, 
+    t.AppointmentDateTime, 
+    tt.TicketTypeName, 
+    d.FirstName AS DoctorFirstName, 
+    d.LastName AS DoctorLastName,
+    s.SpecializationName,
+    t.Status
+FROM 
+    Tickets t
+JOIN 
+    TicketTypes tt ON t.TicketTypeID = tt.TicketTypeID
+JOIN 
+    Doctors d ON t.DoctorID = d.DoctorID
+JOIN 
+    Specializations s ON d.SpecializationID = s.SpecializationID
+WHERE 
+    t.PatientID = 1;
+
+-- Получение всех талонов для конкретного врача
+SELECT 
+    t.TicketID, 
+    t.AppointmentDateTime, 
+    tt.TicketTypeName, 
+    p.FirstName AS PatientFirstName, 
+    p.LastName AS PatientLastName,
+    t.Status
+FROM 
+    Tickets t
+JOIN 
+    TicketTypes tt ON t.TicketTypeID = tt.TicketTypeID
+JOIN 
+    Patients p ON t.PatientID = p.PatientID
+WHERE 
+    t.DoctorID = 1;
+
+--Получение всех талонов по определенной дате
+SELECT 
+    t.TicketID, 
+    p.FirstName AS PatientFirstName, 
+    p.LastName AS PatientLastName,
+    d.FirstName AS DoctorFirstName, 
+    d.LastName AS DoctorLastName, 
+    tt.TicketTypeName, 
+    t.AppointmentDateTime,
+    s.SpecializationName,
+    t.Status
+FROM 
+    Tickets t
+JOIN 
+    Patients p ON t.PatientID = p.PatientID
+JOIN 
+    Doctors d ON t.DoctorID = d.DoctorID
+JOIN 
+    TicketTypes tt ON t.TicketTypeID = tt.TicketTypeID
+JOIN 
+    Specializations s ON d.SpecializationID = s.SpecializationID
+WHERE 
+    CAST(t.AppointmentDateTime AS DATE) = '2024-07-05';
+
+
+	CREATE PROCEDURE GetTicketsByDate
+    @AppointmentDate DATE
+AS
+BEGIN
+    SELECT 
+        t.TicketID, 
+        p.FirstName AS PatientFirstName, 
+        p.LastName AS PatientLastName,
+        d.FirstName AS DoctorFirstName, 
+        d.LastName AS DoctorLastName, 
+        tt.TicketTypeName, 
+        t.AppointmentDateTime,
+        s.SpecializationName,
+        t.Status
+    FROM 
+        Tickets t
+    JOIN 
+        Patients p ON t.PatientID = p.PatientID
+    JOIN 
+        Doctors d ON t.DoctorID = d.DoctorID
+    JOIN 
+        TicketTypes tt ON t.TicketTypeID = tt.TicketTypeID
+    JOIN 
+        Specializations s ON d.SpecializationID = s.SpecializationID
+    WHERE 
+        CAST(t.AppointmentDateTime AS DATE) = @AppointmentDate;
+END;
+GO
+
+CREATE PROCEDURE GetTicketsByDoctor
+    @DoctorID INT
+AS
+BEGIN
+    SELECT 
+        t.TicketID, 
+        t.AppointmentDateTime, 
+        tt.TicketTypeName, 
+        p.FirstName AS PatientFirstName, 
+        p.LastName AS PatientLastName,
+        t.Status
+    FROM 
+        Tickets t
+    JOIN 
+        TicketTypes tt ON t.TicketTypeID = tt.TicketTypeID
+    JOIN 
+        Patients p ON t.PatientID = p.PatientID
+    WHERE 
+        t.DoctorID = @DoctorID;
+END;
+GO
+
+CREATE PROCEDURE GetTicketsByPatient
+    @PatientID INT
+AS
+BEGIN
+    SELECT 
+        t.TicketID, 
+        t.AppointmentDateTime, 
+        tt.TicketTypeName, 
+        d.FirstName AS DoctorFirstName, 
+        d.LastName AS DoctorLastName,
+        s.SpecializationName,
+        t.Status
+    FROM 
+        Tickets t
+    JOIN 
+        TicketTypes tt ON t.TicketTypeID = tt.TicketTypeID
+    JOIN 
+        Doctors d ON t.DoctorID = d.DoctorID
+    JOIN 
+        Specializations s ON d.SpecializationID = s.SpecializationID
+    WHERE 
+        t.PatientID = @PatientID;
+END;
+GO
+
+CREATE PROCEDURE GetDoctorSchedule
+    @DoctorID INT
+AS
+BEGIN
+    SELECT 
+        sc.ScheduleID, 
+        sc.WorkDay, 
+        sc.StartTime, 
+        sc.EndTime
+    FROM 
+        Schedules sc
+    WHERE 
+        sc.DoctorID = @DoctorID;
+END;
+GO
+
+CREATE PROCEDURE GetAllDoctorsAndSpecializations
+AS
+BEGIN
+    SELECT 
+        d.DoctorID, 
+        d.FirstName, 
+        d.LastName, 
+        s.SpecializationName, 
+        d.Phone, 
+        d.Email
+    FROM 
+        Doctors d
+    JOIN 
+        Specializations s ON d.SpecializationID = s.SpecializationID;
+END;
+GO
+
+CREATE PROCEDURE AddPatient
+    @FirstName NVARCHAR(50),
+    @LastName NVARCHAR(50),
+    @DateOfBirth DATE,
+    @Phone NVARCHAR(15),
+    @Email NVARCHAR(50)
+AS
+BEGIN
+    INSERT INTO Patients (FirstName, LastName, DateOfBirth, Phone, Email)
+    VALUES (@FirstName, @LastName, @DateOfBirth, @Phone, @Email);
+
+    -- Возвращаем ID добавленного пациента
+    SELECT SCOPE_IDENTITY() AS NewPatientID;
+END;
+GO
+CREATE PROCEDURE DeletePatient
+    @PatientID INT
+AS
+BEGIN
+    DELETE FROM Patients
+    WHERE PatientID = @PatientID;
+END;
+GO
+CREATE PROCEDURE GetPatientByID
+    @PatientID INT
+AS
+BEGIN
+    SELECT 
+        PatientID, 
+        FirstName, 
+        LastName, 
+        DateOfBirth, 
+        Phone, 
+        Email
+    FROM 
+        Patients
+    WHERE 
+        PatientID = @PatientID;
+END;
+GO
+
+
+
+
+
+
+
+
+
